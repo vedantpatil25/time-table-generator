@@ -152,7 +152,9 @@ export class TimetableGenerator {
    * @returns {Object|null} Best slot or null if none found
    */
   findBestSlot(requirement, schedule, division) {
-    const availableFaculties = this.getAvailableFaculties(requirement.subjectId);
+    const availableFaculties = this.getAvailableFaculties(
+      requirement.subjectId
+    );
     const availableClassrooms = this.getAvailableClassrooms(
       requirement.type,
       division.studentCount
@@ -202,18 +204,21 @@ export class TimetableGenerator {
           for (let j = 0; j < slotsNeeded.length - 1; j++) {
             const currentSlot = slotsNeeded[j];
             const nextSlot = slotsNeeded[j + 1];
-            
+
             // Check if slots are truly consecutive (no gap)
             if (currentSlot.endTime !== nextSlot.startTime) {
               // There's a gap - check if it contains lunch
-              const hasLunchInGap = this.allTimeSlots.some(s => 
-                s.isLunch && 
-                s.startTime >= currentSlot.endTime && 
-                s.endTime <= nextSlot.startTime
+              const hasLunchInGap = this.allTimeSlots.some(
+                (s) =>
+                  s.isLunch &&
+                  s.startTime >= currentSlot.endTime &&
+                  s.endTime <= nextSlot.startTime
               );
-              
+
               if (hasLunchInGap) {
-                console.log(`Skipping ${requirement.subject.name} - lunch break between ${currentSlot.endTime} and ${nextSlot.startTime}`);
+                console.log(
+                  `Skipping ${requirement.subject.name} - lunch break between ${currentSlot.endTime} and ${nextSlot.startTime}`
+                );
                 validSequence = false;
                 break;
               }
@@ -291,14 +296,9 @@ export class TimetableGenerator {
    * @returns {boolean} True if available
    */
   isFacultyAvailable(facultyId, day, timeSlotId, schedule) {
-    // Check across all days for the same time slot to prevent conflicts
-    for (const checkDay of DAYS_OF_WEEK) {
-      const slot = schedule[checkDay][timeSlotId];
-      if (slot && slot.faculty && slot.faculty.id === facultyId) {
-        return false;
-      }
-    }
-    return true;
+    // FIXED: Only check the specific day and time slot
+    const slot = schedule[day][timeSlotId];
+    return !(slot && slot.faculty && slot.faculty.id === facultyId);
   }
 
   /**
@@ -327,7 +327,9 @@ export class TimetableGenerator {
 
     timeSlots.forEach((timeSlot, index) => {
       entries.push({
-        id: `entry_${divisionId}_${slot.day}_${timeSlot.id}_${index}_${Date.now()}`,
+        id: `entry_${divisionId}_${slot.day}_${
+          timeSlot.id
+        }_${index}_${Date.now()}`,
         divisionId,
         day: slot.day,
         timeSlotId: timeSlot.id,
