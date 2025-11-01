@@ -66,6 +66,7 @@ const ClassroomManagement = () => {
   // Separate classrooms by type for better organization
   const theoryRooms = classrooms.filter(c => c.type === CLASSROOM_TYPES.THEORY);
   const labRooms = classrooms.filter(c => c.type === CLASSROOM_TYPES.LAB);
+  const technicalTrainingRooms = classrooms.filter(c => c.type === CLASSROOM_TYPES.TECHNICAL_TRAINING);
 
   return (
     <div className="classroom-management">
@@ -98,6 +99,7 @@ const ClassroomManagement = () => {
                 >
                   <option value={CLASSROOM_TYPES.THEORY}>Theory</option>
                   <option value={CLASSROOM_TYPES.LAB}>Lab</option>
+                  <option value={CLASSROOM_TYPES.TECHNICAL_TRAINING}>Technical Training</option>
                 </select>
               </div>
               <div className="form-group">
@@ -208,6 +210,61 @@ const ClassroomManagement = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Technical Training Classrooms */}
+      <div className="classroom-section">
+        <h3>Technical Training Classrooms ({technicalTrainingRooms.length})</h3>
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Capacity</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {technicalTrainingRooms.map(classroom => (
+                <tr key={classroom.id}>
+                  <td>{classroom.name}</td>
+                  <td>
+                    <span className="type-badge technical-training">
+                      {classroom.type}
+                    </span>
+                  </td>
+                  <td>{classroom.capacity} students</td>
+                  <td>
+                    <button 
+                      className="btn-small btn-edit"
+                      onClick={() => handleEdit(classroom)}
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      className="btn-small btn-delete"
+                      onClick={() => handleDelete(classroom.id)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div style={{marginTop: '2rem', padding: '1rem', background: '#f8f9fa', borderRadius: '4px'}}>
+        <h4>Classroom Summary</h4>
+        <div style={{display: 'flex', gap: '2rem'}}>
+          <p>Theory: {theoryRooms.length} rooms</p>
+          <p>Lab: {labRooms.length} rooms</p>
+          <p>Technical Training: {technicalTrainingRooms.length} rooms</p>
+          <p><strong>Total: {classrooms.length} rooms</strong></p>
         </div>
       </div>
     </div>

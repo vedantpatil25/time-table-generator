@@ -88,7 +88,7 @@ export class TimetableGenerator {
   }
 
   /**
-   * Schedule lectures using a simple greedy algorithm
+   * Schedule lectures using enhanced algorithm with constraints
    * @param {Object} division - Division object
    * @param {Array} requirements - Lecture requirements
    * @returns {Array} Array of timetable entries
@@ -97,13 +97,15 @@ export class TimetableGenerator {
     const entries = [];
     const schedule = this.initializeSchedule();
 
-    // Sort requirements by priority (labs first, then theory)
+    // Enhanced sorting with new priorities
     requirements.sort((a, b) => {
-      if (a.type === SUBJECT_TYPES.LAB && b.type === SUBJECT_TYPES.THEORY)
-        return -1;
-      if (a.type === SUBJECT_TYPES.THEORY && b.type === SUBJECT_TYPES.LAB)
-        return 1;
-      return 0;
+      // Priority: Technical Training > Lab > Theory
+      const priority = {
+        "Technical training": 0,
+        Lab: 1,
+        Theory: 2,
+      };
+      return priority[a.type] - priority[b.type];
     });
 
     requirements.forEach((req) => {
@@ -145,7 +147,7 @@ export class TimetableGenerator {
   }
 
   /**
-   * Find the best available slot for a lecture
+   * Find the best available slot with enhanced constraints
    * @param {Object} requirement - Lecture requirement
    * @param {Object} schedule - Current schedule
    * @param {Object} division - Division object
@@ -160,36 +162,33 @@ export class TimetableGenerator {
       division.studentCount
     );
 
-    if (availableFaculties.length === 0) {
-      console.warn(
-        `No faculty available for subject ${requirement.subject.name}`
-      );
-      return null;
-    }
-
-    if (availableClassrooms.length === 0) {
-      console.warn(
-        `No classroom available for subject type ${requirement.type}`
-      );
+    if (availableFaculties.length === 0 || availableClassrooms.length === 0) {
       return null;
     }
 
     if (requirement.duration > this.timeSlots.length) {
-      console.warn(
-        `Subject ${requirement.subject.name} requires ${requirement.duration} slots but only ${this.timeSlots.length} available`
-      );
       return null;
     }
 
-    // Try to find consecutive slots for multi-duration subjects
+    // Get preferred slot order based on subject type
+    const slotOrder = this.getPreferredSlotOrder(requirement.type);
+
     for (const day of DAYS_OF_WEEK) {
-      for (let i = 0; i <= this.timeSlots.length - requirement.duration; i++) {
+      // Check day-level constraints first
+      if (!this.canScheduleOnDay(requirement, schedule, day)) {
+        continue;
+      }
+
+      for (const startSlotIndex of slotOrder) {
+        if (startSlotIndex > this.timeSlots.length - requirement.duration)
+          continue;
+
         const slotsNeeded = [];
         let validSequence = true;
 
-        // Check if we have enough consecutive slots
+        // Check consecutive slots
         for (let j = 0; j < requirement.duration; j++) {
-          const slot = this.timeSlots[i + j];
+          const slot = this.timeSlots[startSlotIndex + j];
           if (!slot || schedule[day][slot.id].occupied) {
             validSequence = false;
             break;
@@ -199,15 +198,13 @@ export class TimetableGenerator {
 
         if (!validSequence) continue;
 
-        // FIXED: Check for lunch breaks between consecutive slots
+        // Check for lunch breaks
         if (requirement.duration > 1) {
           for (let j = 0; j < slotsNeeded.length - 1; j++) {
             const currentSlot = slotsNeeded[j];
             const nextSlot = slotsNeeded[j + 1];
 
-            // Check if slots are truly consecutive (no gap)
             if (currentSlot.endTime !== nextSlot.startTime) {
-              // There's a gap - check if it contains lunch
               const hasLunchInGap = this.allTimeSlots.some(
                 (s) =>
                   s.isLunch &&
@@ -216,9 +213,6 @@ export class TimetableGenerator {
               );
 
               if (hasLunchInGap) {
-                console.log(
-                  `Skipping ${requirement.subject.name} - lunch break between ${currentSlot.endTime} and ${nextSlot.startTime}`
-                );
                 validSequence = false;
                 break;
               }
@@ -228,7 +222,14 @@ export class TimetableGenerator {
 
         if (!validSequence) continue;
 
-        // Find available faculty for all these slots
+        // Check subject spacing constraint
+        if (
+          !this.isValidSubjectSpacing(requirement, day, slotsNeeded, schedule)
+        ) {
+          continue;
+        }
+
+        // Find available faculty and classroom
         const faculty = availableFaculties.find((f) =>
           slotsNeeded.every((slot) =>
             this.isFacultyAvailable(f.id, day, slot.id, schedule)
@@ -237,7 +238,6 @@ export class TimetableGenerator {
 
         if (!faculty) continue;
 
-        // Find available classroom for all these slots
         const classroom = availableClassrooms.find((c) =>
           slotsNeeded.every((slot) =>
             this.isClassroomAvailable(c.id, day, slot.id, schedule)
@@ -256,6 +256,147 @@ export class TimetableGenerator {
     }
 
     return null;
+  }
+
+  /**
+   * Get preferred slot order based on subject type
+   * @param {string} type - Subject type
+   * @returns {Array} Array of slot indices in preferred order
+   */
+  getPreferredSlotOrder(type) {
+    const totalSlots = this.timeSlots.length;
+
+    if (type === SUBJECT_TYPES.TECHNICAL_TRAINING) {
+      // Technical training prefers slots 5-6 (indices 4-5), then others
+      const preferred = [];
+
+      // Add slots 5-6 first (indices 4-5)
+      if (totalSlots > 4) preferred.push(4);
+      if (totalSlots > 5) preferred.push(5);
+
+      // Add remaining slots
+      for (let i = 0; i < totalSlots; i++) {
+        if (i !== 4 && i !== 5) {
+          preferred.push(i);
+        }
+      }
+
+      return preferred;
+    }
+
+    // For other types, normal order
+    return Array.from({ length: totalSlots }, (_, i) => i);
+  }
+
+  /**
+   * Check if a requirement can be scheduled on a specific day
+   * @param {Object} requirement - Lecture requirement
+   * @param {Object} schedule - Current schedule
+   * @param {string} day - Day to check
+   * @returns {boolean} True if can be scheduled
+   */
+  canScheduleOnDay(requirement, schedule, day) {
+    const daySchedule = schedule[day];
+
+    // Count existing lectures by type on this day
+    const typeCounts = {
+      "Technical training": 0,
+      Lab: 0,
+      Theory: 0,
+    };
+
+    // Count unique lab subjects on this day
+    const labSubjects = new Set();
+
+    // Count existing lectures of the same subject on this day
+    let sameSubjectCount = 0;
+
+    Object.values(daySchedule).forEach((slot) => {
+      if (slot.occupied && slot.subject) {
+        typeCounts[slot.subject.type] =
+          (typeCounts[slot.subject.type] || 0) + 1;
+
+        // Track unique lab subjects
+        if (slot.subject.type === SUBJECT_TYPES.LAB) {
+          labSubjects.add(slot.subject.id);
+        }
+
+        if (slot.subject.id === requirement.subjectId) {
+          sameSubjectCount++;
+        }
+      }
+    });
+
+    // Apply constraints
+
+    // 1. Maximum one technical training per day
+    if (
+      requirement.type === SUBJECT_TYPES.TECHNICAL_TRAINING &&
+      typeCounts["Technical training"] >= 1
+    ) {
+      return false;
+    }
+
+    // 2. Maximum two lab SUBJECTS per day (not slots)
+    if (requirement.type === SUBJECT_TYPES.LAB) {
+      // If this is a new lab subject and we already have 2 lab subjects
+      if (!labSubjects.has(requirement.subjectId) && labSubjects.size >= 2) {
+        return false;
+      }
+    }
+
+    // 3. Maximum two lectures of same subject per day
+    if (sameSubjectCount >= 2) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if subject spacing is valid (avoid consecutive lectures of same subject)
+   * @param {Object} requirement - Lecture requirement
+   * @param {string} day - Day to check
+   * @param {Array} slotsNeeded - Slots being considered
+   * @param {Object} schedule - Current schedule
+   * @returns {boolean} True if spacing is valid
+   */
+  isValidSubjectSpacing(requirement, day, slotsNeeded, schedule) {
+    const daySchedule = schedule[day];
+    const firstSlotIndex = this.timeSlots.findIndex(
+      (slot) => slot.id === slotsNeeded[0].id
+    );
+    const lastSlotIndex = this.timeSlots.findIndex(
+      (slot) => slot.id === slotsNeeded[slotsNeeded.length - 1].id
+    );
+
+    // Check slot before first slot
+    if (firstSlotIndex > 0) {
+      const prevSlot = this.timeSlots[firstSlotIndex - 1];
+      const prevSchedule = daySchedule[prevSlot.id];
+      if (
+        prevSchedule.occupied &&
+        prevSchedule.subject &&
+        prevSchedule.subject.id === requirement.subjectId
+      ) {
+        return false; // Same subject in previous slot
+      }
+    }
+
+    // Check slot after last slot
+    if (lastSlotIndex < this.timeSlots.length - 1) {
+      const nextSlot = this.timeSlots[lastSlotIndex + 1];
+      const nextSchedule = daySchedule[nextSlot.id];
+      if (
+        nextSchedule.occupied &&
+        nextSchedule.subject &&
+        nextSchedule.subject.id === requirement.subjectId
+      ) {
+        return false; // Same subject in next slot
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -279,8 +420,20 @@ export class TimetableGenerator {
    * @returns {Array} Array of available classrooms
    */
   getAvailableClassrooms(type, studentCount) {
-    const requiredType =
-      type === SUBJECT_TYPES.LAB ? CLASSROOM_TYPES.LAB : CLASSROOM_TYPES.THEORY;
+    let requiredType;
+
+    switch (type) {
+      case SUBJECT_TYPES.LAB:
+        requiredType = CLASSROOM_TYPES.LAB;
+        break;
+      case SUBJECT_TYPES.TECHNICAL_TRAINING:
+        requiredType = CLASSROOM_TYPES.TECHNICAL_TRAINING;
+        break;
+      case SUBJECT_TYPES.THEORY:
+      default:
+        requiredType = CLASSROOM_TYPES.THEORY;
+        break;
+    }
 
     return this.classrooms.filter(
       (c) => c.type === requiredType && c.capacity >= studentCount

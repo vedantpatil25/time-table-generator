@@ -64,6 +64,12 @@ const TimetableGrid = ({
     });
   };
 
+  // Helper function to convert subject type to CSS class
+  const getSubjectTypeClass = (type) => {
+    if (!type) return '';
+    return type.toLowerCase().replace(/\s+/g, '-');
+  };
+
   return (
     <div className="timetable-display">
       <div className="timetable-header">
@@ -107,7 +113,7 @@ const TimetableGrid = ({
 
                   return (
                     <td key={day} className="subject-cell">
-                      <div className={`subject-info ${entry.subject?.type?.toLowerCase() || ''}`}>
+                      <div className={`subject-info ${getSubjectTypeClass(entry.subject?.type)}`}>
                         <div className="subject-name">{entry.subject?.name || 'N/A'}</div>
                         <div className="faculty-name">{entry.faculty?.name || 'N/A'}</div>
                         <div className="classroom-name">{entry.classroom?.name || 'N/A'}</div>
@@ -132,6 +138,10 @@ const TimetableGrid = ({
             <div className="legend-item">
               <span className="legend-color lab"></span>
               <span>Lab Classes</span>
+            </div>
+            <div className="legend-item">
+              <span className="legend-color technical-training"></span>
+              <span>Technical Training</span>
             </div>
             <div className="legend-item">
               <span className="legend-color lunch"></span>

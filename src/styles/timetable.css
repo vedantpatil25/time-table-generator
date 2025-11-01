@@ -312,3 +312,22 @@
     background: #e0e0e0 !important;
   }
 }
+
+
+.subject-info.technical-training {
+  background-color: #ff9800;
+  border-left: 4px solid #f57c00;
+  color: white;
+}
+
+.legend-color.technical-training {
+  background-color: #ff9800;
+}
+
+.type-badge.technical-training {
+  background-color: #ff9800;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}

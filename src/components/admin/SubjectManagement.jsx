@@ -114,6 +114,7 @@ const SubjectManagement = () => {
                 >
                   <option value={SUBJECT_TYPES.THEORY}>Theory</option>
                   <option value={SUBJECT_TYPES.LAB}>Lab</option>
+                  <option value={SUBJECT_TYPES.TECHNICAL_TRAINING}>Technical Training</option>
                 </select>
               </div>
               <div className="form-group">
