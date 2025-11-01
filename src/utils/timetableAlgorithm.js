@@ -129,7 +129,7 @@ export class TimetableGenerator {
   }
 
   /**
-   * Find the best available slot with enhanced constraints
+   * Find the best available slot with enhanced constraints and even distribution
    */
   findBestSlot(requirement, schedule, division) {
     const availableFaculties = this.getAvailableFaculties(
@@ -150,7 +150,11 @@ export class TimetableGenerator {
 
     const slotOrder = this.getPreferredSlotOrder(requirement.type);
 
-    for (const day of DAYS_OF_WEEK) {
+    // Try weekdays first (with even distribution), then Saturday as last resort
+    const weekdays = this.getBestDayForDistribution(requirement, schedule);
+    const dayOrder = [...weekdays, "Saturday"];
+
+    for (const day of dayOrder) {
       if (!this.canScheduleOnDay(requirement, schedule, day)) {
         continue;
       }
@@ -235,6 +239,31 @@ export class TimetableGenerator {
   }
 
   /**
+   * Get the best day for even distribution across weekdays
+   */
+  getBestDayForDistribution(requirement, schedule) {
+    const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+
+    // Count lectures per day for this subject
+    const subjectCountPerDay = {};
+    weekdays.forEach((day) => {
+      subjectCountPerDay[day] = 0;
+      Object.values(schedule[day]).forEach((slot) => {
+        if (slot.occupied && slot.subject?.id === requirement.subjectId) {
+          subjectCountPerDay[day]++;
+        }
+      });
+    });
+
+    // Sort days by least lectures for this subject (for even distribution)
+    const sortedDays = weekdays.sort(
+      (a, b) => subjectCountPerDay[a] - subjectCountPerDay[b]
+    );
+
+    return sortedDays;
+  }
+
+  /**
    * Get preferred slot order based on subject type
    */
   getPreferredSlotOrder(type) {
@@ -305,9 +334,17 @@ export class TimetableGenerator {
       }
     }
 
-    // 3. Maximum two lectures of same subject per day
-    if (sameSubjectCount >= 2) {
-      return false;
+    // 3. Different constraints for weekdays vs Saturday
+    if (day === "Saturday") {
+      // More lenient for Saturday - allow up to 3 lectures of same subject
+      if (sameSubjectCount >= 3) {
+        return false;
+      }
+    } else {
+      // Strict for weekdays - maximum 2 lectures of same subject per day
+      if (sameSubjectCount >= 2) {
+        return false;
+      }
     }
 
     return true;
