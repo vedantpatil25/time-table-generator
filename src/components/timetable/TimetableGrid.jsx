@@ -108,7 +108,7 @@ const TimetableGrid = ({
                   return (
                     <td key={day} className="subject-cell">
                       <div className={`subject-info ${entry.subject?.type?.toLowerCase() || ''}`}>
-                        <div className="subject-name">{entry.subject?.code || 'N/A'}</div>
+                        <div className="subject-name">{entry.subject?.name || 'N/A'}</div>
                         <div className="faculty-name">{entry.faculty?.name || 'N/A'}</div>
                         <div className="classroom-name">{entry.classroom?.name || 'N/A'}</div>
                       </div>

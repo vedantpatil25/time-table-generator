@@ -176,7 +176,7 @@ const TimetableGenerator = () => {
                           {details ? (
                             <div className="lecture-info">
                               <div className="subject-name">
-                                {details.subject?.code}
+                                {details.subject?.name}
                               </div>
                               <div className="faculty-name">
                                 {details.faculty?.name}

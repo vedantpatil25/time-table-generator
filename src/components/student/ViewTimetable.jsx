@@ -118,7 +118,7 @@ const ViewTimetable = () => {
                   return (
                     <td key={day} className="subject-cell">
                       <div className="subject-info">
-                        <div className="subject-name">{entry.subject?.code}</div>
+                        <div className="subject-name">{entry.subject?.name}</div>
                         <div className="faculty-name">{entry.faculty?.name}</div>
                         <div className="classroom-name">{entry.classroom?.name}</div>
                       </div>
