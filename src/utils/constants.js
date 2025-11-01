@@ -28,6 +28,7 @@ export const DAYS_OF_WEEK = [
   "Wednesday",
   "Thursday",
   "Friday",
+  "Saturday",
 ];
 
 // In src/data/mockData.js - Replace DEFAULT_TIME_SLOTS

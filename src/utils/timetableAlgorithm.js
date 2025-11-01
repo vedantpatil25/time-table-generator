@@ -12,48 +12,38 @@ export class TimetableGenerator {
     this.subjects = data.subjects || [];
     this.classrooms = data.classrooms || [];
     this.divisions = data.divisions || [];
-    this.allTimeSlots = data.timeSlots || []; // Store all slots including lunch
+    this.allTimeSlots = data.timeSlots || [];
     this.timeSlots = (data.timeSlots || []).filter((slot) => !slot.isLunch);
     this.conflicts = [];
   }
 
   /**
    * Generate timetable for a specific division
-   * @param {string} divisionId - Division ID
-   * @returns {Object} Generated timetable with entries and conflicts
    */
   generateTimetable(divisionId) {
     this.conflicts = [];
 
     try {
       const division = this.divisions.find((d) => d.id === divisionId);
+      if (!division) throw new Error("Division not found");
 
-      if (!division) {
-        throw new Error("Division not found");
-      }
-
-      // Get subjects for this division
       const divisionSubjects = this.subjects.filter(
         (s) => division.subjects && division.subjects.includes(s.id)
       );
-
       if (divisionSubjects.length === 0) {
         throw new Error("No subjects assigned to this division");
       }
 
-      // Create lecture requirements
       const lectureRequirements =
         this.createLectureRequirements(divisionSubjects);
-
-      // Generate timetable entries
       const entries = this.scheduleLectures(division, lectureRequirements);
 
       return {
         id: `tt_${Date.now()}`,
-        divisionId: divisionId,
+        divisionId,
         generatedBy: "system",
         generatedAt: new Date().toISOString(),
-        entries: entries,
+        entries,
         conflicts: this.conflicts,
       };
     } catch (error) {
@@ -64,19 +54,16 @@ export class TimetableGenerator {
 
   /**
    * Create lecture requirements based on subjects
-   * @param {Array} subjects - Array of subjects
-   * @returns {Array} Array of lecture requirements
    */
   createLectureRequirements(subjects) {
     const requirements = [];
 
     subjects.forEach((subject) => {
       const lecturesPerWeek = subject.lecturesPerWeek || 1;
-
       for (let i = 0; i < lecturesPerWeek; i++) {
         requirements.push({
           subjectId: subject.id,
-          subject: subject,
+          subject,
           duration: subject.duration || 1,
           type: subject.type,
           lectureNumber: i + 1,
@@ -89,9 +76,6 @@ export class TimetableGenerator {
 
   /**
    * Schedule lectures using enhanced algorithm with constraints
-   * @param {Object} division - Division object
-   * @param {Array} requirements - Lecture requirements
-   * @returns {Array} Array of timetable entries
    */
   scheduleLectures(division, requirements) {
     const entries = [];
@@ -99,7 +83,6 @@ export class TimetableGenerator {
 
     // Enhanced sorting with new priorities
     requirements.sort((a, b) => {
-      // Priority: Technical Training > Lab > Theory
       const priority = {
         "Technical training": 0,
         Lab: 1,
@@ -126,7 +109,6 @@ export class TimetableGenerator {
 
   /**
    * Initialize empty schedule grid
-   * @returns {Object} Empty schedule grid
    */
   initializeSchedule() {
     const schedule = {};
@@ -148,10 +130,6 @@ export class TimetableGenerator {
 
   /**
    * Find the best available slot with enhanced constraints
-   * @param {Object} requirement - Lecture requirement
-   * @param {Object} schedule - Current schedule
-   * @param {Object} division - Division object
-   * @returns {Object|null} Best slot or null if none found
    */
   findBestSlot(requirement, schedule, division) {
     const availableFaculties = this.getAvailableFaculties(
@@ -170,11 +148,9 @@ export class TimetableGenerator {
       return null;
     }
 
-    // Get preferred slot order based on subject type
     const slotOrder = this.getPreferredSlotOrder(requirement.type);
 
     for (const day of DAYS_OF_WEEK) {
-      // Check day-level constraints first
       if (!this.canScheduleOnDay(requirement, schedule, day)) {
         continue;
       }
@@ -260,14 +236,11 @@ export class TimetableGenerator {
 
   /**
    * Get preferred slot order based on subject type
-   * @param {string} type - Subject type
-   * @returns {Array} Array of slot indices in preferred order
    */
   getPreferredSlotOrder(type) {
     const totalSlots = this.timeSlots.length;
 
     if (type === SUBJECT_TYPES.TECHNICAL_TRAINING) {
-      // Technical training prefers slots 5-6 (indices 4-5), then others
       const preferred = [];
 
       // Add slots 5-6 first (indices 4-5)
@@ -290,25 +263,15 @@ export class TimetableGenerator {
 
   /**
    * Check if a requirement can be scheduled on a specific day
-   * @param {Object} requirement - Lecture requirement
-   * @param {Object} schedule - Current schedule
-   * @param {string} day - Day to check
-   * @returns {boolean} True if can be scheduled
    */
   canScheduleOnDay(requirement, schedule, day) {
     const daySchedule = schedule[day];
-
-    // Count existing lectures by type on this day
     const typeCounts = {
       "Technical training": 0,
       Lab: 0,
       Theory: 0,
     };
-
-    // Count unique lab subjects on this day
     const labSubjects = new Set();
-
-    // Count existing lectures of the same subject on this day
     let sameSubjectCount = 0;
 
     Object.values(daySchedule).forEach((slot) => {
@@ -316,7 +279,6 @@ export class TimetableGenerator {
         typeCounts[slot.subject.type] =
           (typeCounts[slot.subject.type] || 0) + 1;
 
-        // Track unique lab subjects
         if (slot.subject.type === SUBJECT_TYPES.LAB) {
           labSubjects.add(slot.subject.id);
         }
@@ -328,7 +290,6 @@ export class TimetableGenerator {
     });
 
     // Apply constraints
-
     // 1. Maximum one technical training per day
     if (
       requirement.type === SUBJECT_TYPES.TECHNICAL_TRAINING &&
@@ -339,7 +300,6 @@ export class TimetableGenerator {
 
     // 2. Maximum two lab SUBJECTS per day (not slots)
     if (requirement.type === SUBJECT_TYPES.LAB) {
-      // If this is a new lab subject and we already have 2 lab subjects
       if (!labSubjects.has(requirement.subjectId) && labSubjects.size >= 2) {
         return false;
       }
@@ -355,11 +315,6 @@ export class TimetableGenerator {
 
   /**
    * Check if subject spacing is valid (avoid consecutive lectures of same subject)
-   * @param {Object} requirement - Lecture requirement
-   * @param {string} day - Day to check
-   * @param {Array} slotsNeeded - Slots being considered
-   * @param {Object} schedule - Current schedule
-   * @returns {boolean} True if spacing is valid
    */
   isValidSubjectSpacing(requirement, day, slotsNeeded, schedule) {
     const daySchedule = schedule[day];
@@ -370,39 +325,25 @@ export class TimetableGenerator {
       (slot) => slot.id === slotsNeeded[slotsNeeded.length - 1].id
     );
 
-    // Check slot before first slot
-    if (firstSlotIndex > 0) {
-      const prevSlot = this.timeSlots[firstSlotIndex - 1];
-      const prevSchedule = daySchedule[prevSlot.id];
-      if (
-        prevSchedule.occupied &&
-        prevSchedule.subject &&
-        prevSchedule.subject.id === requirement.subjectId
-      ) {
-        return false; // Same subject in previous slot
-      }
-    }
+    // Only check immediately adjacent slots (not with gaps)
+    const checkAdjacent = (index) => {
+      if (index < 0 || index >= this.timeSlots.length) return true;
+      const slot = daySchedule[this.timeSlots[index].id];
+      return !(slot.occupied && slot.subject?.id === requirement.subjectId);
+    };
 
-    // Check slot after last slot
-    if (lastSlotIndex < this.timeSlots.length - 1) {
-      const nextSlot = this.timeSlots[lastSlotIndex + 1];
-      const nextSchedule = daySchedule[nextSlot.id];
-      if (
-        nextSchedule.occupied &&
-        nextSchedule.subject &&
-        nextSchedule.subject.id === requirement.subjectId
-      ) {
-        return false; // Same subject in next slot
-      }
-    }
+    // Only block if IMMEDIATELY adjacent (no gaps allowed)
+    const prevBlocked =
+      firstSlotIndex > 0 && !checkAdjacent(firstSlotIndex - 1);
+    const nextBlocked =
+      lastSlotIndex < this.timeSlots.length - 1 &&
+      !checkAdjacent(lastSlotIndex + 1);
 
-    return true;
+    return !prevBlocked && !nextBlocked;
   }
 
   /**
    * Get faculties who can teach a subject
-   * @param {string} subjectId - Subject ID
-   * @returns {Array} Array of available faculties
    */
   getAvailableFaculties(subjectId) {
     return this.faculties.filter(
@@ -415,9 +356,6 @@ export class TimetableGenerator {
 
   /**
    * Get classrooms of specific type with sufficient capacity
-   * @param {string} type - Subject type (Theory/Lab)
-   * @param {number} studentCount - Number of students
-   * @returns {Array} Array of available classrooms
    */
   getAvailableClassrooms(type, studentCount) {
     let requiredType;
@@ -442,11 +380,6 @@ export class TimetableGenerator {
 
   /**
    * Check if faculty is available at given time
-   * @param {string} facultyId - Faculty ID
-   * @param {string} day - Day of week
-   * @param {string} timeSlotId - Time slot ID
-   * @param {Object} schedule - Current schedule
-   * @returns {boolean} True if available
    */
   isFacultyAvailable(facultyId, day, timeSlotId, schedule) {
     // FIXED: Only check the specific day and time slot
@@ -456,11 +389,6 @@ export class TimetableGenerator {
 
   /**
    * Check if classroom is available at given time
-   * @param {string} classroomId - Classroom ID
-   * @param {string} day - Day of week
-   * @param {string} timeSlotId - Time slot ID
-   * @param {Object} schedule - Current schedule
-   * @returns {boolean} True if available
    */
   isClassroomAvailable(classroomId, day, timeSlotId, schedule) {
     const slot = schedule[day][timeSlotId];
@@ -469,10 +397,6 @@ export class TimetableGenerator {
 
   /**
    * Create a timetable entry
-   * @param {string} divisionId - Division ID
-   * @param {Object} slot - Selected slot
-   * @param {Object} requirement - Lecture requirement
-   * @returns {Array} Array of timetable entries
    */
   createTimetableEntry(divisionId, slot, requirement) {
     const entries = [];
@@ -500,9 +424,6 @@ export class TimetableGenerator {
 
   /**
    * Mark slot as occupied in schedule
-   * @param {Object} schedule - Schedule grid
-   * @param {Object} slot - Selected slot
-   * @param {Object} requirement - Lecture requirement
    */
   markSlotAsOccupied(schedule, slot, requirement) {
     const timeSlots = slot.timeSlots || [];
@@ -520,9 +441,6 @@ export class TimetableGenerator {
 
 /**
  * Simple function to generate timetable
- * @param {Object} data - All app data
- * @param {string} divisionId - Division ID
- * @returns {Object} Generated timetable
  */
 export const generateTimetableForDivision = (data, divisionId) => {
   try {
@@ -536,8 +454,6 @@ export const generateTimetableForDivision = (data, divisionId) => {
 
 /**
  * Validate timetable data before generation
- * @param {Object} data - All app data
- * @returns {Object} Validation result
  */
 export const validateTimetableData = (data) => {
   const errors = [];
